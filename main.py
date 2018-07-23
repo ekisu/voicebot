@@ -3,6 +3,7 @@ from discord.ext import commands
 from gtts import gTTS
 import tempfile
 import asyncio
+from concurrent import futures
 from config import TOKEN, TTS_LANGUAGE, COMMAND
 
 if not discord.opus.is_loaded():
@@ -13,8 +14,7 @@ if not discord.opus.is_loaded():
     # note that on windows this DLL is automatically provided for you
     discord.opus.load_opus('opus')
 
-client = discord.Client()
-players = {}
+EXECUTOR = futures.ThreadPoolExecutor(max_workers=6)
 
 class VoiceEntry:
     def __init__(self, msgCtx, player, tempFile):
@@ -114,7 +114,7 @@ class Voice:
         tts = gTTS(ctx.message.content.strip("!v "), lang=TTS_LANGUAGE)
         try:
             fp = tempfile.TemporaryFile()
-            tts.write_to_fp(fp)
+            await self.bot.loop.run_in_executor(EXECUTOR, tts.write_to_fp, fp)
             fp.seek(0)
             player = state.voice.create_ffmpeg_player(fp, pipe=True, after=state.toggle_next)
         except Exception as e:
