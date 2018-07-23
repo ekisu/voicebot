@@ -1,47 +1,131 @@
 import discord
+from discord.ext import commands
 from gtts import gTTS
 import tempfile
+import asyncio
 from config import TOKEN, TTS_LANGUAGE, COMMAND
+
+if not discord.opus.is_loaded():
+    # the 'opus' library here is opus.dll on windows
+    # or libopus.so on linux in the current directory
+    # you should replace this with the location the
+    # opus library is located in and with the proper filename.
+    # note that on windows this DLL is automatically provided for you
+    discord.opus.load_opus('opus')
 
 client = discord.Client()
 players = {}
 
-@client.event
-async def on_message(message):
-    member = message.author
-    server = member.server
+class VoiceEntry:
+    def __init__(self, msgCtx, player, tempFile):
+        self.requester = msgCtx.author
+        self.channel = msgCtx.channel
+        self.player = player
+        self.tempFile = tempFile
 
-    if message.content == COMMAND + " stop":
-        if server.id in players and players[server.id] is not None:
-            players[server.id].stop()
-            players[server.id] = None
-    elif message.content.startswith(COMMAND + " "):
-        if server.id in players and players[server.id] is not None:
-            return
+class VoiceState:
+    def __init__(self, bot):
+        self.current = None
+        self.voice = None
+        self.bot = bot
+        self.messages = asyncio.Queue()
+        self.play_next_message = asyncio.Event()
+        self.voice_player = self.bot.loop.create_task(self.voice_player_task())
 
-        voice_client = client.voice_client_in(server)
-        msg = message.content.strip(COMMAND + " ")
-        tts = gTTS(msg, lang=TTS_LANGUAGE)
-        voice = None
-        if voice_client is not None:
-            await voice_client.move_to(member.voice.voice_channel)
-            voice = voice_client
+    def is_playing(self):
+        if self.voice is None or self.current is None:
+            return False
+
+        player = self.current.player
+        return not player.is_done()
+
+    @property
+    def player(self):
+        return self.current.player
+
+    def skip(self):
+        if self.is_playing():
+            self.player.stop()
+
+    def toggle_next(self):
+        self.bot.loop.call_soon_threadsafe(self.play_next_message.set)
+
+    async def voice_player_task(self):
+        while True:
+            self.play_next_message.clear()
+            self.current = await self.messages.get()
+            await self.bot.send_message(self.current.channel, "Playing...")
+            self.current.player.start()
+            await self.play_next_message.wait()
+
+class Voice:
+    def __init__(self, bot):
+        self.bot = bot
+        self.voice_states = {}
+
+    def get_voice_state(self, server):
+        state = self.voice_states.get(server.id)
+        if state is None:
+            state = VoiceState(self.bot)
+            self.voice_states[server.id] = state
+        return state
+
+    async def create_voice_client(self, channel):
+        voice = await self.bot.join_voice_channel(channel)
+        state = self.get_voice_state(channel.server)
+        state.voice = voice
+
+    def __unload(self):
+        for state in self.voice_states.values():
+            try:
+                state.voice_player.cancel()
+                if state.voice:
+                    self.bot.loop.create_task(state.voice.disconnect())
+            except:
+                pass
+
+    @commands.command(pass_context=True, no_pm=True)
+    async def summon(self, ctx):
+        """Summons the bot to join your voice channel."""
+        summoned_channel = ctx.message.author.voice_channel
+        if summoned_channel is None:
+            await self.bot.say('You are not in a voice channel.')
+            return False
+
+        state = self.get_voice_state(ctx.message.server)
+        if state.voice is None:
+            state.voice = await self.bot.join_voice_channel(summoned_channel)
         else:
-            voice = await client.join_voice_channel(member.voice.voice_channel)
+            await state.voice.move_to(summoned_channel)
 
-        with tempfile.TemporaryFile() as fp:
+        return True
+
+    @commands.command(pass_context=True, no_pm=True)
+    async def v(self, ctx, *, message: str):
+        state = self.get_voice_state(ctx.message.server)
+        if state.voice is None:
+            success = await ctx.invoke(self.summon)
+            if not success:
+                return
+
+        tts = gTTS(message, lang=TTS_LANGUAGE)
+        try:
+            fp = tempfile.TemporaryFile()
             tts.write_to_fp(fp)
             fp.seek(0)
-            def afterPlaying():
-                players[server.id] = None
-            players[server.id] = voice.create_ffmpeg_player(fp, pipe=True, after=afterPlaying)
-            players[server.id].start()
+            player = state.voice.create_ffmpeg_player(fp, pipe=True, after=state.toggle_next)
+        except Exception as e:
+            fmt = 'An error occurred while processing this request: ```py\n{}: {}\n```'
+            await self.bot.send_message(ctx.message.channel, fmt.format(type(e).__name__, e))
+        else:
+            entry = VoiceEntry(ctx.message, player, fp)
+            await state.messages.put(entry)
 
-@client.event
+bot = commands.Bot(command_prefix=commands.when_mentioned_or('!'), description='A speech-to-text bot.')
+bot.add_cog(Voice(bot))
+
+@bot.event
 async def on_ready():
-    print('Logged in as')
-    print(client.user.name)
-    print(client.user.id)
-    print('------')
+    print('Logged in as:\n{0} (ID: {0.id})'.format(bot.user))
 
-client.run(TOKEN)
+bot.run(TOKEN)
