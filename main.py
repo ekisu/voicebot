@@ -100,15 +100,18 @@ class Voice:
 
         return True
 
-    @commands.command(pass_context=True, no_pm=True)
-    async def v(self, ctx, *, message: str):
+    @commands.group(pass_context=True, no_pm=True)
+    async def v(self, ctx):
+        if ctx.invoked_subcommand is not None:
+            return
+
         state = self.get_voice_state(ctx.message.server)
         if state.voice is None:
             success = await ctx.invoke(self.summon)
             if not success:
                 return
 
-        tts = gTTS(message, lang=TTS_LANGUAGE)
+        tts = gTTS(ctx.message.content.strip("!v "), lang=TTS_LANGUAGE)
         try:
             fp = tempfile.TemporaryFile()
             tts.write_to_fp(fp)
@@ -120,6 +123,15 @@ class Voice:
         else:
             entry = VoiceEntry(ctx.message, player, fp)
             await state.messages.put(entry)
+
+    @v.command(pass_context=True, no_pm=True)
+    async def skip(self, ctx):
+        state = self.get_voice_state(ctx.message.server)
+        if not state.is_playing():
+            self.bot.say("Not in a voice channel.")
+            return
+
+        state.skip()
 
 bot = commands.Bot(command_prefix=commands.when_mentioned_or('!'), description='A speech-to-text bot.')
 bot.add_cog(Voice(bot))
