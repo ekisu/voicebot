@@ -31,7 +31,6 @@ class VoiceState:
         self.messages = asyncio.Queue()
         self.play_next_message = asyncio.Event()
         self.voice_player = self.bot.loop.create_task(self.voice_player_task())
-        self.tts_mode = False
 
     def is_playing(self):
         if self.voice is None or self.current is None:
@@ -62,7 +61,9 @@ class VoiceState:
 class Voice:
     def __init__(self, bot):
         self.bot = bot
+        #self.bot.add_listener(self.on_message, 'on_message')
         self.voice_states = {}
+        self.tts_mode = {}
 
     def get_voice_state(self, server):
         state = self.voice_states.get(server.id)
@@ -90,7 +91,7 @@ class Voice:
         """Summons the bot to join your voice channel."""
         summoned_channel = ctx.message.author.voice_channel
         if summoned_channel is None:
-            await self.bot.say('You are not in a voice channel.')
+            await self.bot.send_message(ctx.message.channel, 'You are not in a voice channel.')
             return False
 
         state = self.get_voice_state(ctx.message.server)
@@ -100,6 +101,20 @@ class Voice:
             await state.voice.move_to(summoned_channel)
 
         return True
+
+    async def addToQueue(self, state, message, content):
+        tts = gTTS(content, lang=TTS_LANGUAGE)
+        try:
+            fp = tempfile.TemporaryFile()
+            await self.bot.loop.run_in_executor(EXECUTOR, tts.write_to_fp, fp)
+            fp.seek(0)
+            player = state.voice.create_ffmpeg_player(fp, pipe=True, after=state.toggle_next)
+        except Exception as e:
+            fmt = 'An error occurred while processing this request: ```py\n{}: {}\n```'
+            await self.bot.send_message(message.channel, fmt.format(type(e).__name__, e))
+        else:
+            entry = VoiceEntry(message, player, fp)
+            await state.messages.put(entry)
 
     @commands.group(pass_context=True, no_pm=True)
     async def v(self, ctx):
@@ -112,18 +127,7 @@ class Voice:
             if not success:
                 return
 
-        tts = gTTS(ctx.message.content.strip("!v "), lang=TTS_LANGUAGE)
-        try:
-            fp = tempfile.TemporaryFile()
-            await self.bot.loop.run_in_executor(EXECUTOR, tts.write_to_fp, fp)
-            fp.seek(0)
-            player = state.voice.create_ffmpeg_player(fp, pipe=True, after=state.toggle_next)
-        except Exception as e:
-            fmt = 'An error occurred while processing this request: ```py\n{}: {}\n```'
-            await self.bot.send_message(ctx.message.channel, fmt.format(type(e).__name__, e))
-        else:
-            entry = VoiceEntry(ctx.message, player, fp)
-            await state.messages.put(entry)
+        await self.addToQueue(state, ctx.message, ctx.message.content.strip("!v "))
 
     @v.command(pass_context=True, no_pm=True)
     async def skip(self, ctx):
@@ -158,6 +162,28 @@ class Voice:
             await state.voice.disconnect()
         except:
             pass
+
+    @v.command(pass_context=True, no_pm=True)
+    async def tts(self, ctx):
+        server = message.server
+        if server.id not in self.tts_mode or not self.tts_mode[server.id]:
+            self.tts_mode[server.id] = True
+            await self.bot.say("TTS mode is now on.")
+        else:
+            self.tts_mode[server.id] = False
+            await self.bot.say("TTS mode is now off.")
+
+    async def on_message(self, message):
+        server = message.server
+        if message.content.startswith("!") or server.id not in self.tts_mode or not self.tts_mode[server.id]:
+            await self.bot.process_commands(message)
+            return
+
+        state = self.get_voice_state(message.server)
+        if state.voice is None:
+            return
+
+        await self.addToQueue(state, message, message.content)
 
 bot = commands.Bot(command_prefix=commands.when_mentioned_or('!'), description='A speech-to-text bot.')
 bot.add_cog(Voice(bot))
