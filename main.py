@@ -31,6 +31,7 @@ class VoiceState:
         self.messages = asyncio.Queue()
         self.play_next_message = asyncio.Event()
         self.voice_player = self.bot.loop.create_task(self.voice_player_task())
+        self.tts_mode = False
 
     def is_playing(self):
         if self.voice is None or self.current is None:
@@ -128,10 +129,35 @@ class Voice:
     async def skip(self, ctx):
         state = self.get_voice_state(ctx.message.server)
         if not state.is_playing():
-            self.bot.say("Not in a voice channel.")
+            await self.bot.say("Not playing anything.")
             return
 
         state.skip()
+
+    @v.command(pass_context=True, no_pm=True)
+    async def stop(self, ctx):
+        state = self.get_voice_state(ctx.message.server)
+        if not state.messages.empty():
+            state.messages = asyncio.Queue()
+            await self.bot.say("Queue cleared.")
+
+        state.skip()
+
+    @v.command(pass_context=True, no_pm=True)
+    async def leave(self, ctx):
+        server = ctx.message.server
+        state = self.get_voice_state(server)
+
+        if state.is_playing():
+            player = state.player
+            player.stop()
+
+        try:
+            state.voice_player.cancel()
+            del self.voice_states[server.id]
+            await state.voice.disconnect()
+        except:
+            pass
 
 bot = commands.Bot(command_prefix=commands.when_mentioned_or('!'), description='A speech-to-text bot.')
 bot.add_cog(Voice(bot))
