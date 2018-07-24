@@ -55,7 +55,6 @@ class VoiceState:
         while True:
             self.play_next_message.clear()
             self.current = await self.messages.get()
-            await self.bot.send_message(self.current.channel, "Playing...")
             self.current.player.start()
             await self.play_next_message.wait()
 
