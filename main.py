@@ -160,7 +160,7 @@ class Voice:
     @r.command(pass_context=True, no_pm=True)
     async def list(self, ctx):
         out = "```"
-        for audio in os.listdir("audios"):
+        for audio in sorted(os.listdir("audios")):
             out += "{}\n".format(audio[:-4]) # remove .mp3
         out += "```"
         await self.bot.say(out)
