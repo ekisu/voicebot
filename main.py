@@ -3,6 +3,7 @@ from discord.ext import commands
 from gtts import gTTS
 import tempfile
 import asyncio
+import aiohttp
 import os
 from concurrent import futures
 from config import TOKEN, TTS_LANGUAGE, COMMAND
@@ -164,6 +165,18 @@ class Voice:
             out += "{}\n".format(audio[:-4]) # remove .mp3
         out += "```"
         await self.bot.say(out)
+
+    @r.command(pass_context=True, no_pm=True)
+    async def add(self, ctx, audioName : str, link : str):
+        try:
+            async with aiohttp.ClientSession() as session, \
+                  session.get(link) as resp, \
+                  open("audios/{}.mp3".format(audioName)) as f:
+                f.write(await resp.read())
+                await self.bot.say("`{}` added successfully!".format(audioName))
+        except Exception as e:
+            fmt = 'An error occurred while processing this request: ```py\n{}: {}\n```'
+            await self.bot.send_message(ctx.message.channel, fmt.format(type(e).__name__, e))
 
     @v.command(pass_context=True, no_pm=True)
     async def stop(self, ctx):
