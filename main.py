@@ -171,7 +171,7 @@ class Voice:
         try:
             async with aiohttp.ClientSession() as session, \
                   session.get(link) as resp, \
-                  open("audios/{}.mp3".format(audioName)) as f:
+                  open("audios/{}.mp3".format(audioName), "wb") as f:
                 f.write(await resp.read())
                 await self.bot.say("`{}` added successfully!".format(audioName))
         except Exception as e:
