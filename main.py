@@ -60,7 +60,7 @@ class VoiceState:
             self.play_next_message.clear()
             self.current = await self.messages.get()
             if self.current.copycolaTexto != None:
-                self.bot.send_message(self.current.channel, self.current.copycolaTexto)
+                await self.bot.send_message(self.current.channel, self.current.copycolaTexto)
             self.current.player.start()
             await self.play_next_message.wait()
 
