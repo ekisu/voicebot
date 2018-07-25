@@ -3,6 +3,7 @@ from discord.ext import commands
 from gtts import gTTS
 import tempfile
 import asyncio
+import os
 from concurrent import futures
 from config import TOKEN, TTS_LANGUAGE, COMMAND
 
@@ -134,8 +135,13 @@ class Voice:
 
         state.skip()
 
-    @commands.command(pass_context=True, no_pm=True)
-    async def r(self, ctx, audioName : str):
+    @commands.group(pass_context=True, no_pm=True)
+    async def r(self, ctx):
+        if ctx.invoked_subcommand is not None:
+            return
+
+        audioName = ctx.message.content.strip("!r ")
+
         state = self.get_voice_state(ctx.message.server)
         if state.voice is None:
             success = await ctx.invoke(self.summon)
@@ -150,6 +156,14 @@ class Voice:
         else:
             entry = VoiceEntry(ctx.message, player, None)
             await state.messages.put(entry)
+
+    @r.command(pass_context=True, no_pm=True)
+    async def list(self, ctx):
+        out = "```"
+        for audio in os.listdir("audios"):
+            out += "{}\n".format(audio.rstrip(".mp3"))
+        out += "```"
+        await self.bot.say(out)
 
     @v.command(pass_context=True, no_pm=True)
     async def stop(self, ctx):
