@@ -143,7 +143,7 @@ class Voice:
                 return
 
         try:
-            player = state.voice.create_ffmpeg_player("xj6.mp3", pipe=True, after=state.toggle_next)
+            player = state.voice.create_ffmpeg_player("xj6.mp3", after=state.toggle_next)
         except Exception as e:
             fmt = 'An error occurred while processing this request: ```py\n{}: {}\n```'
             await self.bot.send_message(ctx.message.channel, fmt.format(type(e).__name__, e))
