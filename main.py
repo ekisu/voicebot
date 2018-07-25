@@ -19,11 +19,12 @@ if not discord.opus.is_loaded():
 EXECUTOR = futures.ThreadPoolExecutor(max_workers=6)
 
 class VoiceEntry:
-    def __init__(self, msgCtx, player, tempFile):
+    def __init__(self, msgCtx, player, tempFile, copycolaTexto = None):
         self.requester = msgCtx.author
         self.channel = msgCtx.channel
         self.player = player
         self.tempFile = tempFile
+        self.copycolaTexto = None
 
 class VoiceState:
     def __init__(self, bot):
@@ -32,6 +33,7 @@ class VoiceState:
         self.bot = bot
         self.messages = asyncio.Queue()
         self.play_next_message = asyncio.Event()
+        self.play_next_audio = asyncio.Event()
         self.voice_player = self.bot.loop.create_task(self.voice_player_task())
         self.tts_mode = False
 
@@ -57,6 +59,8 @@ class VoiceState:
         while True:
             self.play_next_message.clear()
             self.current = await self.messages.get()
+            if self.current.copycolaTexto != None:
+                self.bot.send_message(self.current.channel, self.current.copycolaTexto)
             self.current.player.start()
             await self.play_next_message.wait()
 
@@ -136,47 +140,6 @@ class Voice:
 
         state.skip()
 
-    @commands.group(pass_context=True, no_pm=True)
-    async def r(self, ctx):
-        if ctx.invoked_subcommand is not None:
-            return
-
-        audioName = ctx.message.content[3:]
-
-        state = self.get_voice_state(ctx.message.server)
-        if state.voice is None:
-            success = await ctx.invoke(self.summon)
-            if not success:
-                return
-
-        try:
-            player = state.voice.create_ffmpeg_player("audios/{}.mp3".format(audioName), after=state.toggle_next)
-        except Exception as e:
-            fmt = 'An error occurred while processing this request: ```py\n{}: {}\n```'
-            await self.bot.send_message(ctx.message.channel, fmt.format(type(e).__name__, e))
-        else:
-            entry = VoiceEntry(ctx.message, player, None)
-            await state.messages.put(entry)
-
-    @r.command(pass_context=True, no_pm=True)
-    async def list(self, ctx):
-        out = "```"
-        for audio in sorted(os.listdir("audios")):
-            out += "{}\n".format(audio[:-4]) # remove .mp3
-        out += "```"
-        await self.bot.say(out)
-
-    @r.command(pass_context=True, no_pm=True)
-    async def add(self, ctx, audioName : str, link : str):
-        try:
-            async with aiohttp.ClientSession() as session, session.get(link) as resp:
-                with open("audios/{}.mp3".format(audioName), "wb") as f:
-                    f.write(await resp.read())
-                    await self.bot.say("`{}` added successfully!".format(audioName))
-        except Exception as e:
-            fmt = 'An error occurred while processing this request: ```py\n{}: {}\n```'
-            await self.bot.send_message(ctx.message.channel, fmt.format(type(e).__name__, e))
-
     @v.command(pass_context=True, no_pm=True)
     async def stop(self, ctx):
         state = self.get_voice_state(ctx.message.server)
@@ -238,6 +201,90 @@ class Voice:
         else:
             entry = VoiceEntry(message, player, fp)
             await state.messages.put(entry)
+
+    @commands.group(pass_context=True, no_pm=True)
+    async def r(self, ctx):
+        if ctx.invoked_subcommand is not None:
+            return
+
+        audioName = ctx.message.content[3:]
+
+        state = self.get_voice_state(ctx.message.server)
+        if state.voice is None:
+            success = await ctx.invoke(self.summon)
+            if not success:
+                return
+
+        try:
+            player = state.voice.create_ffmpeg_player("audios/{}.mp3".format(audioName), after=state.toggle_next)
+        except Exception as e:
+            fmt = 'An error occurred while processing this request: ```py\n{}: {}\n```'
+            await self.bot.send_message(ctx.message.channel, fmt.format(type(e).__name__, e))
+        else:
+            entry = VoiceEntry(ctx.message, player, None)
+            await state.messages.put(entry)
+
+    @r.command(pass_context=True, no_pm=True)
+    async def list(self, ctx):
+        out = "```"
+        for audio in sorted(os.listdir("audios")):
+            out += "{}\n".format(audio[:-4]) # remove .mp3
+        out += "```"
+        await self.bot.say(out)
+
+    @r.command(pass_context=True, no_pm=True)
+    async def add(self, ctx, audioName : str, link : str):
+        try:
+            async with aiohttp.ClientSession() as session, session.get(link) as resp:
+                with open("audios/{}.mp3".format(audioName), "wb") as f:
+                    f.write(await resp.read())
+                    await self.bot.say("`{}` added successfully!".format(audioName))
+        except Exception as e:
+            fmt = 'An error occurred while processing this request: ```py\n{}: {}\n```'
+            await self.bot.send_message(ctx.message.channel, fmt.format(type(e).__name__, e))
+
+    @commands.group(pass_context=True, no_pm=True)
+    async def c(self, ctx):
+        if ctx.invoked_subcommand is not None:
+            return
+
+        copycolaName = ctx.message.content[3:]
+        state = self.get_voice_state(ctx.message.server)
+        if state.voice is None:
+            success = await ctx.invoke(self.summon)
+            if not success:
+                return
+
+        try:
+            f = open("copycola/{}.txt".format(copycolaName), "r")
+            player = state.voice.create_ffmpeg_player("copycola/{}.mp3".format(copycolaName), after=state.toggle_next)
+            texto = f.read()
+        except Exception as e:
+            fmt = 'An error occurred while processing this request: ```py\n{}: {}\n```'
+            await self.bot.send_message(ctx.message.channel, fmt.format(type(e).__name__, e))
+        else:
+            entry = VoiceEntry(ctx.message, player, None, texto)
+            await state.messages.put(entry)
+
+    @c.command(pass_context=True, no_pm=True, name="add")
+    async def addCopycola(self, ctx, name, *, texto: str):
+        tts = gTTS(message.content, lang=TTS_LANGUAGE)
+        try:
+            with open("copycola/{}.txt".format(name), "w") as ftext, open("copycola/{}.mp3".format(name), "wb") as fmp3:
+                await self.bot.loop.run_in_executor(EXECUTOR, tts.write_to_fp, fmp3)
+                ftext.write(texto)
+        except Exception as e:
+            fmt = 'An error occurred while processing this request: ```py\n{}: {}\n```'
+            await self.bot.send_message(message.channel, fmt.format(type(e).__name__, e))
+
+    @c.command(pass_context=True, no_pm=True, name="list")
+    async def listCopycola(self, ctx):
+        out = "```"
+        for cc in sorted(os.listdir("copycola")):
+            if cc.endswith(".mp3"):
+                out += "{}\n".format(cc[:-4]) # remove .mp3
+        out += "```"
+        await self.bot.say(out)
 
 bot = commands.Bot(command_prefix=commands.when_mentioned_or('!'), description='A speech-to-text bot.')
 voiceBot = Voice(bot)
