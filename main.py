@@ -113,7 +113,7 @@ class Voice:
             if not success:
                 return
 
-        tts = gTTS(ctx.message.content.strip("!v "), lang=TTS_LANGUAGE)
+        tts = gTTS(ctx.message.content[3:], lang=TTS_LANGUAGE)
         try:
             fp = tempfile.TemporaryFile()
             await self.bot.loop.run_in_executor(EXECUTOR, tts.write_to_fp, fp)
@@ -140,7 +140,7 @@ class Voice:
         if ctx.invoked_subcommand is not None:
             return
 
-        audioName = ctx.message.content.strip("!r ")
+        audioName = ctx.message.content[3:]
 
         state = self.get_voice_state(ctx.message.server)
         if state.voice is None:
@@ -161,7 +161,7 @@ class Voice:
     async def list(self, ctx):
         out = "```"
         for audio in os.listdir("audios"):
-            out += "{}\n".format(audio.rstrip(".mp3"))
+            out += "{}\n".format(audio[:-4]) # remove .mp3
         out += "```"
         await self.bot.say(out)
 
