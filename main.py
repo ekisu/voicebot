@@ -28,41 +28,54 @@ class VoiceEntry:
 
 class VoiceState:
     def __init__(self, bot):
-        self.current = None
         self.voice = None
         self.bot = bot
+
+        self.currentMessage = None
+        self.currentAudio = None
         self.messages = asyncio.Queue()
+        self.audios = asyncio.Queue()
         self.play_next_message = asyncio.Event()
         self.play_next_audio = asyncio.Event()
         self.voice_player = self.bot.loop.create_task(self.voice_player_task())
-        self.tts_mode = False
+        self.audio_player = self.bot.loop.create_task(self.audio_player_task())
 
     def is_playing(self):
-        if self.voice is None or self.current is None:
+        if self.voice is None or self.currentMessage is None:
             return False
 
-        player = self.current.player
+        player = self.currentMessage.player
         return not player.is_done()
 
     @property
     def player(self):
-        return self.current.player
+        return self.currentMessage.player
 
     def skip(self):
         if self.is_playing():
             self.player.stop()
 
-    def toggle_next(self):
+    def toggle_next_message(self):
         self.bot.loop.call_soon_threadsafe(self.play_next_message.set)
+
+    def toggle_next_audio(self):
+        self.bot.loop.call_soon_threadsafe(self.play_next_audio.set)
 
     async def voice_player_task(self):
         while True:
             self.play_next_message.clear()
-            self.current = await self.messages.get()
-            if self.current.copycolaTexto != None:
-                await self.bot.send_message(self.current.channel, self.current.copycolaTexto)
-            self.current.player.start()
+            self.currentMessage = await self.messages.get()
+            if self.currentMessage.copycolaTexto != None:
+                await self.bot.send_message(self.currentMessage.channel, self.currentMessage.copycolaTexto)
+            self.currentMessage.player.start()
             await self.play_next_message.wait()
+
+    async def audio_player_task(self):
+        while True:
+            self.play_next_audio.clear()
+            self.currentAudio = await self.audios.get()
+            self.currentAudio.player.start()
+            await self.play_next_audio.wait()
 
 class Voice:
     def __init__(self, bot):
@@ -86,6 +99,7 @@ class Voice:
         for state in self.voice_states.values():
             try:
                 state.voice_player.cancel()
+                state.audio_player.cancel()
                 if state.voice:
                     self.bot.loop.create_task(state.voice.disconnect())
             except:
@@ -123,7 +137,7 @@ class Voice:
             fp = tempfile.TemporaryFile()
             await self.bot.loop.run_in_executor(EXECUTOR, tts.write_to_fp, fp)
             fp.seek(0)
-            player = state.voice.create_ffmpeg_player(fp, pipe=True, after=state.toggle_next)
+            player = state.voice.create_ffmpeg_player(fp, pipe=True, after=state.toggle_next_message)
         except Exception as e:
             fmt = 'An error occurred while processing this request: ```py\n{}: {}\n```'
             await self.bot.send_message(ctx.message.channel, fmt.format(type(e).__name__, e))
@@ -194,7 +208,7 @@ class Voice:
             fp = tempfile.TemporaryFile()
             await self.bot.loop.run_in_executor(EXECUTOR, tts.write_to_fp, fp)
             fp.seek(0)
-            player = state.voice.create_ffmpeg_player(fp, pipe=True, after=state.toggle_next)
+            player = state.voice.create_ffmpeg_player(fp, pipe=True, after=state.toggle_next_message)
         except Exception as e:
             fmt = 'An error occurred while processing this request: ```py\n{}: {}\n```'
             await self.bot.send_message(message.channel, fmt.format(type(e).__name__, e))
@@ -218,13 +232,13 @@ class Voice:
                 return
 
         try:
-            player = state.voice.create_ffmpeg_player("audios/{}.mp3".format(audioName), after=state.toggle_next)
+            player = state.voice.create_ffmpeg_player("audios/{}.mp3".format(audioName), after=state.toggle_next_audio)
         except Exception as e:
             fmt = 'An error occurred while processing this request: ```py\n{}: {}\n```'
             await self.bot.send_message(ctx.message.channel, fmt.format(type(e).__name__, e))
         else:
             entry = VoiceEntry(ctx.message, player, None)
-            await state.messages.put(entry)
+            await state.audios.put(entry)
 
     @r.command(pass_context=True, no_pm=True)
     async def list(self, ctx):
@@ -262,7 +276,7 @@ class Voice:
 
         try:
             f = open("copycola/{}.txt".format(copycolaName), "r")
-            player = state.voice.create_ffmpeg_player("copycola/{}.mp3".format(copycolaName), after=state.toggle_next)
+            player = state.voice.create_ffmpeg_player("copycola/{}.mp3".format(copycolaName), after=state.toggle_next_message)
             texto = f.read()
         except Exception as e:
             fmt = 'An error occurred while processing this request: ```py\n{}: {}\n```'
