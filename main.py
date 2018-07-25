@@ -208,6 +208,8 @@ class Voice:
             return
 
         audioName = ctx.message.content[3:]
+        if audioName == "":
+            return
 
         state = self.get_voice_state(ctx.message.server)
         if state.voice is None:
@@ -249,6 +251,9 @@ class Voice:
             return
 
         copycolaName = ctx.message.content[3:]
+        if copycolaName == "":
+            return
+            
         state = self.get_voice_state(ctx.message.server)
         if state.voice is None:
             success = await ctx.invoke(self.summon)
@@ -268,14 +273,16 @@ class Voice:
 
     @c.command(pass_context=True, no_pm=True, name="add")
     async def addCopycola(self, ctx, name, *, texto: str):
-        tts = gTTS(message.content, lang=TTS_LANGUAGE)
+        tts = gTTS(ctx.message.content, lang=TTS_LANGUAGE)
         try:
             with open("copycola/{}.txt".format(name), "w") as ftext, open("copycola/{}.mp3".format(name), "wb") as fmp3:
                 await self.bot.loop.run_in_executor(EXECUTOR, tts.write_to_fp, fmp3)
                 ftext.write(texto)
+
+            await self.bot.say("`{}` added successfully!".format(name))
         except Exception as e:
             fmt = 'An error occurred while processing this request: ```py\n{}: {}\n```'
-            await self.bot.send_message(message.channel, fmt.format(type(e).__name__, e))
+            await self.bot.send_message(ctx.message.channel, fmt.format(type(e).__name__, e))
 
     @c.command(pass_context=True, no_pm=True, name="list")
     async def listCopycola(self, ctx):
