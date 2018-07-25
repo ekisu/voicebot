@@ -134,8 +134,8 @@ class Voice:
 
         state.skip()
 
-    @v.command(pass_context=True, no_pm=True)
-    async def xj6(self, ctx):
+    @commands.command(pass_context=True, no_pm=True)
+    async def r(self, ctx, audioName : str):
         state = self.get_voice_state(ctx.message.server)
         if state.voice is None:
             success = await ctx.invoke(self.summon)
@@ -143,7 +143,7 @@ class Voice:
                 return
 
         try:
-            player = state.voice.create_ffmpeg_player("xj6.mp3", after=state.toggle_next)
+            player = state.voice.create_ffmpeg_player("audios/{}.mp3".format(audioName), after=state.toggle_next)
         except Exception as e:
             fmt = 'An error occurred while processing this request: ```py\n{}: {}\n```'
             await self.bot.send_message(ctx.message.channel, fmt.format(type(e).__name__, e))
