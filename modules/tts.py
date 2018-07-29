@@ -6,6 +6,7 @@ import discord
 from discord.ext import commands
 import tempfile
 import sys
+import aiohttp
 sys.path.append("..")
 from voice_context import VoiceEntry
 
