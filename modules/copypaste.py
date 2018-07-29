@@ -23,11 +23,9 @@ class CopypasteBot:
         if copycolaName == "":
             return
 
-        state = self.get_voice_state(ctx.message.server)
-        if state.voice is None:
-            success = await ctx.invoke(self.summon)
-            if not success:
-                return
+        state = await ctx.invoke(self.voiceCtx.obtainVoiceState)
+        if not state or not state.voice:
+            return
 
         try:
             f = open("copycola/{}.txt".format(copycolaName), "r")
