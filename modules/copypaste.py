@@ -7,6 +7,7 @@ import sys
 import aiohttp
 from gtts import gTTS
 sys.path.append("..")
+from config import TTS_LANGUAGE
 from voice_context import VoiceEntry
 
 EXECUTOR = futures.ThreadPoolExecutor(max_workers=6)
