@@ -5,6 +5,7 @@ import discord
 from discord.ext import commands
 import sys
 import aiohttp
+from gtts import gTTS
 sys.path.append("..")
 from voice_context import VoiceEntry
 
