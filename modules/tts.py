@@ -65,12 +65,9 @@ class TTSBot:
             player = state.player
             player.stop()
 
-        try:
-            state.voice_player.cancel()
-            del self.voice_states[server.id]
-            await state.voice.disconnect()
-        except:
-            pass
+        state.voice_player.cancel()
+        del self.voice_states[server.id]
+        await state.voice.disconnect()
 
     @v.command(pass_context=True, no_pm=True)
     async def tts(self, ctx):
