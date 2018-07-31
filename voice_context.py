@@ -89,3 +89,16 @@ class VoiceContext:
             await state.voice.move_to(summoned_channel)
 
         return state
+
+    @commands.command(pass_context=True, no_pm=True, name="leave")
+    async def leave(self, ctx):
+        server = ctx.message.server
+        state = await ctx.invoke(self.obtainVoiceState)
+
+        if state.is_playing():
+            player = state.player
+            player.stop()
+
+        state.voice_player.cancel()
+        del self.voice_states[server.id]
+        await state.voice.disconnect()

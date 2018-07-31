@@ -57,19 +57,6 @@ class TTSBot:
         state.skip()
 
     @v.command(pass_context=True, no_pm=True)
-    async def leave(self, ctx):
-        server = ctx.message.server
-        state = await ctx.invoke(self.voiceCtx.obtainVoiceState)
-
-        if state.is_playing():
-            player = state.player
-            player.stop()
-
-        state.voice_player.cancel()
-        del self.voice_states[server.id]
-        await state.voice.disconnect()
-
-    @v.command(pass_context=True, no_pm=True)
     async def tts(self, ctx):
         state = await ctx.invoke(self.voiceCtx.obtainVoiceState)
         if not state or not state.voice:
