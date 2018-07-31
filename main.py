@@ -22,6 +22,7 @@ if not discord.opus.is_loaded():
 bot = commands.Bot(command_prefix=commands.when_mentioned_or('!'), description='A speech-to-text bot.')
 voiceCtx = VoiceContext(bot)
 voiceBot = TTSBot(bot, voiceCtx)
+bot.add_cog(voiceCtx)
 bot.add_cog(voiceBot)
 bot.add_cog(AudiosBot(bot, voiceCtx))
 bot.add_cog(CopypasteBot(bot, voiceCtx))
